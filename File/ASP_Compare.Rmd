@@ -1,0 +1,130 @@
+---
+title: "MLB ALL STAR PITCHER COMPARISON 2021 "
+output: ioslides_presentation
+---
+ 
+```{r,echo = FALSE, message = FALSE,  warning = FALSE}
+library(dplyr)
+library(plotly)
+```
+## INTRODUCTION
+
+It's always fun to compare professional players and with the All-Star game coming up now would be a good time do so.
+This analysis will focus on Starting Pitchers only, so no position, Designated Hiiter, or relief pitchers will be evaluated. However, there will be one exception, Shohei Ohtani is the designated hitter for the all star game, but considering that he is a 2 way player that is both a starting pitcher and position player, it's fair to assess him.
+
+## DATA
+We will be using data from StatHead to get the players stats, and USAToday.databases to get the salary of the players.
+The stats we will be looking at are Strike Outs(K), Strike Out Percentage(K%), ERA(Earned Run Avaergae), and their WHIP (Walks Plus Hits Per Inning).
+
+## Organize Pitcher Data 
+
+```{r}
+p_data <- read.csv(file = 'PitcherData.csv')
+s_data <- read.csv(file = "Salary.csv")
+allStars <- c("Shohei Ohtani", "Shane Bieber", "Nathan Eovaldi", 
+              "Kyle Gibson", "Yusei Kikuchi","Lance Lynn", 
+              "Carlos Rodon", "Corbin Burnes", "Yu Darvish", 
+              "Jacob deGrom", "Kevin Gausman","German Marquez", 
+              "Trevor Rogers", "Zack Wheeler","Brandon Woodruff", 
+              "Gerrit Cole")
+cleaned_p_data <- p_data[p_data$Player %in% allStars,]
+keep <- c("Player", "SO", "K.", "BB","ERA", "H","IP")
+cleaned_p_data <- cleaned_p_data[keep]
+# THEN REORGANIZE THE COLUMNS AND ADD THE WHIP COLUMN
+cleaned_p_data <- cleaned_p_data[,c(1,2,3,5,4,6,7)]
+cleaned_p_data <- cleaned_p_data %>% 
+  mutate(WHIP = round((H + BB)/IP,digits = 2))
+# NOW REMOVE THE IP, H, AND BB COLUMNS FROM THE DATA
+cleaned_p_data <- subset(cleaned_p_data, select = - c(IP,H,BB)) 
+merged_data <- merge(cleaned_p_data,s_data) # ADD SALARY
+```
+
+## NEW PITCHING DATA
+```{r, echo = FALSE}
+merged_data
+```
+
+## CREATE AN AVERAGE ALL-STAR
+
+```{r,echo = TRUE}
+avgSO <- round(mean(merged_data$SO), digits =2)
+avgK. <-round(mean(as.numeric((sub("%", "",merged_data$K.)))), 
+              digits = 2) # avergae strike out %
+avgK. <- toString(avgK.) 
+avgK. <- paste(avgK., "%", sep = "")
+avgERA<- round(mean(merged_data$ERA), digits = 2)
+avgWHIP <- round(mean(merged_data$WHIP),digits = 2)
+convertCurrency <- function(currency) {
+  currency1 <- sub('$','',as.character(currency),fixed=TRUE)
+  as.numeric(gsub('\\,','',as.character(currency1))) 
+} # function to conevert $ to decimal
+reConvertCurrency <- function(value){
+  paste("$",format(value, big.mark=","),sep="")
+} # turn decimal back to $
+
+```
+## BINDING THE DATA 
+```{r}
+avgSalary <- reConvertCurrency(round(mean(convertCurrency
+                                          (merged_data$Salary)), 
+                                           digits = 2))
+
+AvgPlayer <- data.frame("Average All Star", 
+                        avgSO , avgK.,avgERA, 
+                        avgWHIP, avgSalary )
+
+AvgPlayer <- setNames(AvgPlayer, c("Player","SO",
+                                   "K.", "ERA", 
+                                   "WHIP", "Salary"))
+
+binded_data <- rbind(merged_data, AvgPlayer )
+```
+## ADD CREATED PITCHER
+
+```{r, echo = FALSE}
+binded_data
+```
+# THE GRAPHS
+
+## ERA VS SALARY
+```{r, echo = FALSE,warning=FALSE}
+x <- list(
+  title = "Salary")
+figERA <- plot_ly(binded_data, 
+               x = ~convertCurrency(Salary), 
+               y = ~ERA, 
+               mode = "text+markers",
+               type = "scatter", 
+               text = ~Player,
+               textposition = "top right")
+figERA <- figERA %>% layout(title = "ERA VS SALARY", xaxis = x)
+figERA
+
+```
+## WHIP VS SALARY
+```{r,echo = FALSE, warning=FALSE}
+figWHIP <- plot_ly(binded_data, 
+                   x = ~convertCurrency(Salary), 
+                   y = ~WHIP, 
+                   mode = "text+markers",
+                   type = "scatter", 
+                   text = ~Player,
+                   textposition = "top right")
+figWHIP <- figWHIP %>% layout(title = "WHIP VS SALARY", xaxis = x)
+figWHIP
+```
+
+## SO VS SALARY
+```{r, echo = FALSE, warning=FALSE}
+figSO <- plot_ly(binded_data, 
+                 x = ~convertCurrency(Salary), 
+                 y = ~SO, 
+                 mode = "markers+text",
+                 type = "scatter", 
+                 text = ~Player,
+                 textposition = "top right",
+                 hovertext = paste("SO % :", binded_data$K.))
+                
+figSO <- figSO %>% layout(title = "STRIKE OUTS VS SALARY", xaxis = x)
+figSO
+```
